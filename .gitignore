@@ -1,2 +1,8 @@
-/target
-/.apt*
+/target/*
+!/target/generated-sources/
+/target/generated-sources/*
+!/target/generated-sources/annotations
+/target/generated-sources/annotations/*
+!/target/generated-sources/annotations/module-info.java
+
+.env

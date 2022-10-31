@@ -25,6 +25,8 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.Files;
@@ -32,10 +34,13 @@ import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -70,9 +75,14 @@ import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import io.github.cdimascio.dotenv.Dotenv;
 
 public class WebScraper
 {
@@ -1959,14 +1969,6 @@ public class WebScraper
 	{
 		for (int i = 0; i < workPane.length; i++)
 		{
-			try
-			{
-				Thread.sleep(new Random().nextInt(2000) + 3000);
-			}
-			catch (InterruptedException e)
-			{
-				e.printStackTrace();
-			}
 			final int ii = i;
 			Thread search = new Thread()
 			{
@@ -1974,32 +1976,52 @@ public class WebScraper
 				public void run()
 				{
 					boolean gotIt = false;
-					int pageNo = 0;
+					int pageNo = 1;
 					do
 					{
-						String google = "http://www.google.com/search?client=firefox-b-1-d&q=";
 						String searchTxt = keyword[ii].getText();
 						String charset = "UTF-8";
-						String userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0";
+
+						Dotenv dotenv = Dotenv.load();
+						String API_KEY = dotenv.get("GOOGLE_API_KEY");
+						String ENGINE_ID = dotenv.get("GOOGLE_ENGINE_ID");
+						// String userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0";
 
 						try
 						{
-							// + "&num=100&start=" + pageNo
-							Elements links = Jsoup
-									.connect(google + URLEncoder.encode(searchTxt, charset))
-									.userAgent(userAgent).timeout(5000).get().select(".g>.r>a");
+							// + 
+							// Elements links = Jsoup
+							// 		.connect(google + URLEncoder.encode(searchTxt, charset))
+							// 		.userAgent(userAgent).timeout(5000).get().select(".g>.r>a");
 
-							for (Element link : links)
+							String google = "https://www.googleapis.com/customsearch/v1?fields=items/link" 
+											+ "&key=" + API_KEY 
+											+ "&cx=" + ENGINE_ID + "&q=" + URLEncoder.encode(searchTxt, charset)
+											+ "&num=10&start=" + pageNo;
+
+							URL search = new URL(google);
+							URLConnection connection = search.openConnection();  
+							connection.setDoOutput(true);  
+							JSONTokener tokener = new JSONTokener(search.openStream());
+							JSONObject root = new JSONObject(tokener);
+
+							JSONArray searchResults = root.getJSONArray("items");
+
+							ArrayList<String> links = new ArrayList<String>();
+
+							for (int i=0;i<searchResults.length();i++){ 
+								links.add(searchResults.getJSONObject(i).getString("link"));
+							} 
+
+							for (String link : links)
 							{
-								String urlTxt = link.absUrl("href");
-								System.out.println(urlTxt);
-								urlTxt = URLDecoder.decode(
-										urlTxt.substring(urlTxt.indexOf('=') + 1, urlTxt.indexOf('&')), "UTF-8");
+								// link = URLDecoder.decode(
+								// 		link.substring(link.indexOf('=') + 1, link.indexOf('&')), "UTF-8");
 
-								if (urlTxt.contains(ii < 2 ? "techyv.com" : "nettv4u.com"))
+								if (link.contains(ii < 2 ? "techyv.com" : "nettv4u.com"))
 								{
 									gotIt = true;
-									url[ii].setText(urlTxt);
+									url[ii].setText(link);
 									retrieve[ii].setEnabled(true);
 									retrieve[ii].setBackgroundColor(new Color(85, 127, 164), new Color(35, 90, 130));
 									loader[ii].setIcon(
@@ -2011,7 +2033,7 @@ public class WebScraper
 
 							if (!gotIt && links.size() > 0)
 							{
-								pageNo += 100;
+								pageNo += 10;
 							}
 							else if (!gotIt && links.size() == 0)
 							{
@@ -2023,7 +2045,7 @@ public class WebScraper
 									counter[1]++;
 
 								keyword[ii].setText(newKeyword);
-								pageNo = 0;
+								pageNo = 1;
 							}
 
 						}

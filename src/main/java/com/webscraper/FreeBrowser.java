@@ -8,8 +8,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 import javax.imageio.ImageIO;
@@ -19,10 +22,14 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
@@ -152,8 +159,8 @@ public class FreeBrowser extends Application
 
 		found = false;
 
-		goButton.setGraphic(new ImageView(new Image(WebScraper.class.getResource("/resources/reload.png").toString())));
-		backButton.setGraphic(new ImageView(new Image(WebScraper.class.getResource("/resources/back.png").toString())));
+		goButton.setGraphic(new ImageView(new Image(WebScraper.class.getResource("/reload.png").toString())));
+		backButton.setGraphic(new ImageView(new Image(WebScraper.class.getResource("/back.png").toString())));
 		retrieveButton.setDisable(true);
 
 		HBox address = new HBox();
@@ -195,7 +202,8 @@ public class FreeBrowser extends Application
 
 				link = link.contains("https") ? link.substring(8) : link.substring(7);
 
-				if (link.contains("google") || link.contains("ad"))
+				// if (link.contains("google") || link.contains("ad"))
+				if(true)
 				{
 					File captureFile = new File(
 							System.getProperty("user.home") + "\\Documents\\WebScraper\\ss" + FreeBrowser.i + ".png");
@@ -361,26 +369,49 @@ public class FreeBrowser extends Application
 
 							WebScraper.window.keyword[i].setText(newKeyword);
 
-							String google = "http://www.google.com/search?q=";
+							Dotenv dotenv = Dotenv.load();
+							String API_KEY = dotenv.get("GOOGLE_API_KEY");
+							String ENGINE_ID = dotenv.get("GOOGLE_ENGINE_ID");
+
+							// String google = "http://www.google.com/search?q=";
 							String charset = "UTF-8";
-							String userAgent = "ExampleBot 1.0 (+http://example.com/bot)";
+							// String userAgent = "ExampleBot 1.0 (+http://example.com/bot)";
 
 							try
 							{
-								Elements links = Jsoup.connect(
-										google + URLEncoder.encode(newKeyword, charset) + "&num=100&start=" + pageNo)
-										.userAgent(userAgent).get().select(".g>.r>a");
+								// Elements links = Jsoup.connect(
+								// 		google + URLEncoder.encode(newKeyword, charset) + "&num=100&start=" + pageNo)
+								// 		.userAgent(userAgent).get().select(".g>.r>a");
 
-								for (Element link : links)
+								String google = "https://www.googleapis.com/customsearch/v1?fields=items/link" 
+											+ "&key=" + API_KEY 
+											+ "&cx=" + ENGINE_ID + "&q=" + URLEncoder.encode(newKeyword, charset)
+											+ "&num=10&start=" + pageNo;
+
+								URL search = new URL(google);
+								URLConnection connection = search.openConnection();  
+								connection.setDoOutput(true);  
+								JSONTokener tokener = new JSONTokener(search.openStream());
+								JSONObject root = new JSONObject(tokener);
+
+								JSONArray searchResults = root.getJSONArray("items");
+
+								ArrayList<String> links = new ArrayList<String>();
+
+								for (int i=0;i<searchResults.length();i++){ 
+									links.add(searchResults.getJSONObject(i).getString("link"));
+								} 
+
+								for (String link : links)
 								{
-									String urlTxt = link.absUrl("href");
-									urlTxt = URLDecoder.decode(
-											urlTxt.substring(urlTxt.indexOf('=') + 1, urlTxt.indexOf('&')), "UTF-8");
+									// String link = link.absUrl("href");
+									// link = URLDecoder.decode(
+									// 		link.substring(link.indexOf('=') + 1, link.indexOf('&')), "UTF-8");
 
-									if (urlTxt.contains(i < 2 ? "techyv.com" : "nettv4u.com"))
+									if (link.contains(i < 2 ? "techyv.com" : "nettv4u.com"))
 									{
 										gotIt = true;
-										WebScraper.window.url[i].setText(urlTxt);
+										WebScraper.window.url[i].setText(link);
 										WebScraper.window.retrieve[i].setEnabled(true);
 										WebScraper.window.retrieve[i].setBackgroundColor(
 												new java.awt.Color(85, 127, 164), new java.awt.Color(35, 90, 130));
@@ -434,7 +465,7 @@ public class FreeBrowser extends Application
 								new java.awt.Color(120, 181, 25));
 
 					WebScraper.window.done[i]
-							.setIcon(new ImageIcon(WebScraper.class.getResource("/resources/done.png")));
+							.setIcon(new ImageIcon(WebScraper.class.getResource("/done.png")));
 
 					WebScraper.window.checkDone();
 
